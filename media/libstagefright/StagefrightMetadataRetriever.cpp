@@ -381,7 +381,8 @@ static VideoFrame *extractVideoFrame(
     int32_t srcFormat;
     CHECK(outputFormat->findInt32("color-format", &srcFormat));
 
-    ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, OMX_COLOR_Format16bitRGB565);
+    //  Added by Ray Park : Set forced YUV420 Planar for Nexell VPU Video Decoder
+    ColorConverter converter((OMX_COLOR_FORMATTYPE)OMX_COLOR_FormatYUV420Planar, OMX_COLOR_Format16bitRGB565);
 
     if (converter.isValid()) {
         err = converter.convert(

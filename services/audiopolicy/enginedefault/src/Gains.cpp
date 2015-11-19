@@ -176,6 +176,12 @@ const VolumeCurvePoint *Gains::sVolumeProfiles[AUDIO_STREAM_CNT]
         Gains::sSilentVolumeCurve,    // DEVICE_CATEGORY_EARPIECE
         Gains::sSilentVolumeCurve     // DEVICE_CATEGORY_EXT_MEDIA
     },
+    { // AUDIO_STREAM_EXT_SPEAKER
+        Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
+        Gains::sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
+        Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EARPIECE
+        Gains::sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+    },
     { // AUDIO_STREAM_ACCESSIBILITY
         Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER

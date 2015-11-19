@@ -41,6 +41,10 @@
 #include <ConfigParsingUtils.h>
 #include <policy.h>
 
+#ifdef ENABLE_DUAL_AUDIO
+#include <NX_IDualAudio.h>
+#endif
+
 namespace android {
 
 // ----------------------------------------------------------------------------
@@ -2971,6 +2975,14 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         run(buffer, ANDROID_PRIORITY_AUDIO);
     }
 #endif //AUDIO_POLICY_TEST
+
+#ifdef ENABLE_DUAL_AUDIO
+    NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+    if( pDualAudio ) {
+        pDualAudio->SetConfig( 1, 0, AUDIO_CHANNEL_OUT_STEREO, 48000, AUDIO_FORMAT_PCM_SUB_16_BIT );
+        //pDualAudio->ChangeDebugLevel( 0 );
+    }
+#endif
 }
 
 AudioPolicyManager::~AudioPolicyManager()
@@ -2989,6 +3001,10 @@ AudioPolicyManager::~AudioPolicyManager()
    mOutputs.clear();
    mInputs.clear();
    mHwModules.clear();
+
+#ifdef ENABLE_DUAL_AUDIO
+    ReleaseDualAudioInstance();
+#endif
 }
 
 status_t AudioPolicyManager::initCheck()
@@ -4650,6 +4666,13 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
         }
     }
 
+#ifdef ENABLE_DUAL_AUDIO
+    if (stream == AUDIO_STREAM_EXT_SPEAKER ) {
+        NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+        if (pDualAudio) pDualAudio->SetVolume(stream, volume);
+    }
+#endif
+
     return NO_ERROR;
 }
 
@@ -4862,6 +4885,9 @@ audio_stream_type_t AudioPolicyManager::streamTypefromAttributesInt(const audio_
     case AUDIO_USAGE_NOTIFICATION_EVENT:
         return AUDIO_STREAM_NOTIFICATION;
 
+    case AUDIO_USAGE_EXT_SPEAKER:
+        return AUDIO_STREAM_EXT_SPEAKER;
+
     case AUDIO_USAGE_UNKNOWN:
     default:
         return AUDIO_STREAM_MUSIC;
@@ -4893,6 +4919,7 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
     case AUDIO_USAGE_GAME:
     case AUDIO_USAGE_VIRTUAL_SOURCE:
+    case AUDIO_USAGE_EXT_SPEAKER:
         break;
     default:
         return false;

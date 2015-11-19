@@ -230,6 +230,7 @@ routing_strategy Engine::getStrategyForStream(audio_stream_type_t stream)
         // NOTE: SYSTEM stream uses MEDIA strategy because muting music and switching outputs
         // while key clicks are played produces a poor result
     case AUDIO_STREAM_MUSIC:
+    case AUDIO_STREAM_EXT_SPEAKER:
         return STRATEGY_MEDIA;
     case AUDIO_STREAM_ENFORCED_AUDIBLE:
         return STRATEGY_ENFORCED_AUDIBLE;
@@ -262,6 +263,7 @@ routing_strategy Engine::getStrategyForUsage(audio_usage_t usage)
     case AUDIO_USAGE_GAME:
     case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
+    case AUDIO_USAGE_EXT_SPEAKER:
         return STRATEGY_MEDIA;
 
     case AUDIO_USAGE_VOICE_COMMUNICATION:

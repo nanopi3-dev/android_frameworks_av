@@ -35,6 +35,11 @@
 
 #include "matroska/MatroskaExtractor.h"
 
+//	Added by Ray Park
+#ifdef ENABLE_FFMPEG_EXTRACTOR
+#include <FFmpegExtractor.h>
+#endif
+
 #include <media/IMediaHTTPConnection.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -127,8 +132,29 @@ bool DataSource::sniff(
         }
     }
 
+	//	Ray : for FFMPEG Extractor
+    List<SnifferFunc>::iterator it_end = gSniffers.end();
+    it_end--;
+
     for (List<SnifferFunc>::iterator it = gSniffers.begin();
          it != gSniffers.end(); ++it) {
+        String8 newMimeType;
+        float newConfidence;
+        sp<AMessage> newMeta;
+        if ((*it)(this, &newMimeType, &newConfidence, &newMeta)) {
+            if (newConfidence > *confidence) {
+                *mimeType = newMimeType;
+                *confidence = newConfidence;
+                *meta = newMeta;
+            }
+        }
+    }
+
+	//	Ray : This is for FFMPEG Sniffer
+    if (*confidence == 0.0)
+    {
+        List<SnifferFunc>::iterator it = gSniffers.end();
+        it--;
         String8 newMimeType;
         float newConfidence;
         sp<AMessage> newMeta;
@@ -156,6 +182,10 @@ void DataSource::RegisterSniffer_l(SnifferFunc func) {
     gSniffers.push_back(func);
 }
 
+//
+//	Ray : Don't change Sniffer Ordering(Best Media Scaning)
+//
+
 // static
 void DataSource::RegisterDefaultSniffers() {
     Mutex::Autolock autoLock(gSnifferMutex);
@@ -170,11 +200,18 @@ void DataSource::RegisterDefaultSniffers() {
     RegisterSniffer_l(SniffFLAC);
     RegisterSniffer_l(SniffAMR);
     RegisterSniffer_l(SniffMPEG2TS);
+#ifdef ENABLE_FFMPEG_EXTRACTOR
+    RegisterSniffer_l(SniffAVIFFMPEG);
+#endif
     RegisterSniffer_l(SniffMP3);
     RegisterSniffer_l(SniffAAC);
     RegisterSniffer_l(SniffMPEG2PS);
     RegisterSniffer_l(SniffWVM);
     RegisterSniffer_l(SniffMidi);
+
+#ifdef ENABLE_FFMPEG_EXTRACTOR
+    RegisterSniffer_l(SniffFFMPEG);
+#endif
 
     char value[PROPERTY_VALUE_MAX];
     if (property_get("drm.service.enabled", value, NULL)
