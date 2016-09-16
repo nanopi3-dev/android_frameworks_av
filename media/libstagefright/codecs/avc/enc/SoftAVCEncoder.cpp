@@ -244,6 +244,10 @@ OMX_ERRORTYPE SoftAVCEncoder::initEncParams() {
     if (mColorFormat != OMX_COLOR_FormatYUV420Planar || mInputDataIsMeta) {
         // Color conversion is needed.
         free(mInputFrameData);
+        if (((uint64_t)mWidth * mHeight) > ((uint64_t)INT32_MAX / 3)) {
+            ALOGE("Buffer size is too big.");
+            return OMX_ErrorUndefined;
+        }
         mInputFrameData =
             (uint8_t *) malloc((mWidth * mHeight * 3 ) >> 1);
         CHECK(mInputFrameData != NULL);
@@ -264,6 +268,10 @@ OMX_ERRORTYPE SoftAVCEncoder::initEncParams() {
 
     int32_t nMacroBlocks = divUp(mWidth, 16) * divUp(mHeight, 16);
     CHECK(mSliceGroup == NULL);
+    if ((size_t)nMacroBlocks > SIZE_MAX / sizeof(uint32_t)) {
+        ALOGE("requested memory size is too big.");
+        return OMX_ErrorUndefined;
+    }
     mSliceGroup = (uint32_t *) malloc(sizeof(uint32_t) * nMacroBlocks);
     CHECK(mSliceGroup != NULL);
     for (int ii = 0, idx = 0; ii < nMacroBlocks; ++ii) {
@@ -362,6 +370,10 @@ OMX_ERRORTYPE SoftAVCEncoder::internalGetParameter(
             OMX_VIDEO_PARAM_BITRATETYPE *bitRate =
                 (OMX_VIDEO_PARAM_BITRATETYPE *) params;
 
+            if (!isValidOMXParam(bitRate)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (bitRate->nPortIndex != 1) {
                 return OMX_ErrorUndefined;
             }
@@ -375,6 +387,10 @@ OMX_ERRORTYPE SoftAVCEncoder::internalGetParameter(
         {
             OMX_VIDEO_PARAM_AVCTYPE *avcParams =
                 (OMX_VIDEO_PARAM_AVCTYPE *)params;
+
+            if (!isValidOMXParam(avcParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (avcParams->nPortIndex != 1) {
                 return OMX_ErrorUndefined;
@@ -419,6 +435,10 @@ OMX_ERRORTYPE SoftAVCEncoder::internalSetParameter(
             OMX_VIDEO_PARAM_BITRATETYPE *bitRate =
                 (OMX_VIDEO_PARAM_BITRATETYPE *) params;
 
+            if (!isValidOMXParam(bitRate)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (bitRate->nPortIndex != 1 ||
                 bitRate->eControlRate != OMX_Video_ControlRateVariable) {
                 return OMX_ErrorUndefined;
@@ -432,6 +452,10 @@ OMX_ERRORTYPE SoftAVCEncoder::internalSetParameter(
         {
             OMX_VIDEO_PARAM_AVCTYPE *avcType =
                 (OMX_VIDEO_PARAM_AVCTYPE *)params;
+
+            if (!isValidOMXParam(avcType)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (avcType->nPortIndex != 1) {
                 return OMX_ErrorUndefined;

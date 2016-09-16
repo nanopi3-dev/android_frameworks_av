@@ -34,6 +34,12 @@ namespace android {
 
 static const int kRate = 48000;
 
+// Opus uses Vorbis channel mapping, and Vorbis channel mapping specifies
+// mappings for up to 8 channels. This information is part of the Vorbis I
+// Specification:
+// http://www.xiph.org/vorbis/doc/Vorbis_I_spec.html
+static const int kMaxChannels = 8;
+
 template<class T>
 static void InitOMXParams(T *params) {
     params->nSize = sizeof(T);
@@ -101,7 +107,7 @@ void SoftOpus::initPorts() {
     def.eDir = OMX_DirOutput;
     def.nBufferCountMin = kNumBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
-    def.nBufferSize = kMaxNumSamplesPerBuffer * sizeof(int16_t);
+    def.nBufferSize = kMaxNumSamplesPerBuffer * sizeof(int16_t) * kMaxChannels;
     def.bEnabled = OMX_TRUE;
     def.bPopulated = OMX_FALSE;
     def.eDomain = OMX_PortDomainAudio;
@@ -128,6 +134,10 @@ OMX_ERRORTYPE SoftOpus::internalGetParameter(
             OMX_AUDIO_PARAM_ANDROID_OPUSTYPE *opusParams =
                 (OMX_AUDIO_PARAM_ANDROID_OPUSTYPE *)params;
 
+            if (!isValidOMXParam(opusParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (opusParams->nPortIndex != 0) {
                 return OMX_ErrorUndefined;
             }
@@ -149,6 +159,10 @@ OMX_ERRORTYPE SoftOpus::internalGetParameter(
         {
             OMX_AUDIO_PARAM_PCMMODETYPE *pcmParams =
                 (OMX_AUDIO_PARAM_PCMMODETYPE *)params;
+
+            if (!isValidOMXParam(pcmParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (pcmParams->nPortIndex != 1) {
                 return OMX_ErrorUndefined;
@@ -185,6 +199,10 @@ OMX_ERRORTYPE SoftOpus::internalSetParameter(
             const OMX_PARAM_COMPONENTROLETYPE *roleParams =
                 (const OMX_PARAM_COMPONENTROLETYPE *)params;
 
+            if (!isValidOMXParam(roleParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (strncmp((const char *)roleParams->cRole,
                         "audio_decoder.opus",
                         OMX_MAX_STRINGNAME_SIZE - 1)) {
@@ -198,6 +216,10 @@ OMX_ERRORTYPE SoftOpus::internalSetParameter(
         {
             const OMX_AUDIO_PARAM_ANDROID_OPUSTYPE *opusParams =
                 (const OMX_AUDIO_PARAM_ANDROID_OPUSTYPE *)params;
+
+            if (!isValidOMXParam(opusParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (opusParams->nPortIndex != 0) {
                 return OMX_ErrorUndefined;
@@ -224,12 +246,6 @@ static uint16_t ReadLE16(const uint8_t *data, size_t data_size,
     val |= data[read_offset + 1] << 8;
     return val;
 }
-
-// Opus uses Vorbis channel mapping, and Vorbis channel mapping specifies
-// mappings for up to 8 channels. This information is part of the Vorbis I
-// Specification:
-// http://www.xiph.org/vorbis/doc/Vorbis_I_spec.html
-static const int kMaxChannels = 8;
 
 // Maximum packet size used in Xiph's opusdec.
 static const int kMaxOpusOutputPacketSizeSamples = 960 * 6;
@@ -428,12 +444,17 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
 
         const uint8_t *data = inHeader->pBuffer + inHeader->nOffset;
         const uint32_t size = inHeader->nFilledLen;
+        size_t frameSize = kMaxOpusOutputPacketSizeSamples;
+        if (frameSize > outHeader->nAllocLen / sizeof(int16_t) / mHeader->channels) {
+            frameSize = outHeader->nAllocLen / sizeof(int16_t) / mHeader->channels;
+            android_errorWriteLog(0x534e4554, "27833616");
+        }
 
         int numFrames = opus_multistream_decode(mDecoder,
                                                 data,
                                                 size,
                                                 (int16_t *)outHeader->pBuffer,
-                                                kMaxOpusOutputPacketSizeSamples,
+                                                frameSize,
                                                 0);
         if (numFrames < 0) {
             ALOGE("opus_multistream_decode returned %d", numFrames);
