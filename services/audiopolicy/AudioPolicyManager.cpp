@@ -103,6 +103,10 @@ extern "C" {
 #include "AudioUtil.h"
 }
 
+#ifdef ENABLE_DUAL_AUDIO
+#include <NX_IDualAudio.h>
+#endif
+
 namespace android {
 
 // ----------------------------------------------------------------------------
@@ -4258,8 +4262,16 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         run(buffer, ANDROID_PRIORITY_AUDIO);
     }
 #endif //AUDIO_POLICY_TEST
+
 #ifdef DTS_EAGLE
     create_route_node();
+#endif
+
+#ifdef ENABLE_DUAL_AUDIO
+    NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+    if (pDualAudio) {
+        pDualAudio->SetConfig(1, 0, AUDIO_CHANNEL_OUT_STEREO, 48000, AUDIO_FORMAT_PCM_SUB_16_BIT);
+    }
 #endif
 }
 
@@ -4281,6 +4293,10 @@ AudioPolicyManager::~AudioPolicyManager()
    mHwModules.clear();
 #ifdef DTS_EAGLE
     remove_route_node();
+#endif
+
+#ifdef ENABLE_DUAL_AUDIO
+    ReleaseDualAudioInstance();
 #endif
 }
 
@@ -4926,7 +4942,7 @@ status_t AudioPolicyManager::checkInputsForDevice(audio_devices_t device,
         // check if one opened input is not needed any more after disconnecting one device
         for (size_t input_index = 0; input_index < mInputs.size(); input_index++) {
             desc = mInputs.valueAt(input_index);
-//FIXME::  Audio team			
+//FIXME::  Audio team
             if (!(desc->mProfile->mSupportedDevices.types() & mAvailableInputDevices.types() &
                     ~AUDIO_DEVICE_BIT_IN)) {
                 ALOGV("checkInputsForDevice(): disconnecting adding input %d",
@@ -5399,6 +5415,7 @@ AudioPolicyManager::routing_strategy AudioPolicyManager::getStrategy(
 #ifdef AUDIO_EXTN_INCALL_MUSIC_ENABLED
     case AUDIO_STREAM_INCALL_MUSIC:
 #endif
+    case AUDIO_STREAM_EXT_SPEAKER:
         return STRATEGY_MEDIA;
     case AUDIO_STREAM_ENFORCED_AUDIBLE:
         return STRATEGY_ENFORCED_AUDIBLE;
@@ -5438,6 +5455,7 @@ uint32_t AudioPolicyManager::getStrategyForAttr(const audio_attributes_t *attr) 
     case AUDIO_USAGE_GAME:
     case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
+    case AUDIO_USAGE_EXT_SPEAKER:
         return (uint32_t) STRATEGY_MEDIA;
 
     case AUDIO_USAGE_VOICE_COMMUNICATION:
@@ -6718,6 +6736,12 @@ const AudioPolicyManager::VolumeCurvePoint
         sSilentVolumeCurve, // DEVICE_CATEGORY_EARPIECE
         sSilentVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
     },
+    { // AUDIO_STREAM_EXT_SPEAKER
+        sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
+        sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
+        sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EARPIECE
+        sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+    },
     { // AUDIO_STREAM_ACCESSIBILITY
         sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
         sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
@@ -6923,6 +6947,13 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
             mLastVoiceVolume = voiceVolume;
         }
     }
+
+#ifdef ENABLE_DUAL_AUDIO
+    if( stream == AUDIO_STREAM_EXT_SPEAKER ) {
+        NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+        if( pDualAudio ) pDualAudio->SetVolume( stream, volume );
+    }
+#endif
 
     return NO_ERROR;
 }
@@ -9239,6 +9270,9 @@ audio_stream_type_t AudioPolicyManager::streamTypefromAttributesInt(const audio_
     case AUDIO_USAGE_NOTIFICATION_EVENT:
         return AUDIO_STREAM_NOTIFICATION;
 
+    case AUDIO_USAGE_EXT_SPEAKER:
+        return AUDIO_STREAM_EXT_SPEAKER;
+
     case AUDIO_USAGE_UNKNOWN:
     default:
         return AUDIO_STREAM_MUSIC;
@@ -9530,7 +9564,7 @@ audio_io_handle_t AudioPolicyManager::getPassthroughOutput(
            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
            config.sample_rate = samplingRate;
            config.channel_mask = channelMask;
-           config.format = format; 
+           config.format = format;
            if (offloadInfo != NULL) {
                config.offload_info = *offloadInfo;
            }
@@ -9705,6 +9739,7 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa) {
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
     case AUDIO_USAGE_GAME:
     case AUDIO_USAGE_VIRTUAL_SOURCE:
+    case AUDIO_USAGE_EXT_SPEAKER:
         break;
     default:
         return false;

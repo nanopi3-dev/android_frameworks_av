@@ -59,6 +59,10 @@
 #include <media/AudioParameter.h>
 #endif // DOLBY_UDC
 
+#ifdef ENABLE_DUAL_AUDIO
+#include <NX_IDualAudio.h>
+#endif
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -469,6 +473,13 @@ AudioFlinger::PlaybackThread::Track::Track(
         mObservedUnderruns = thread->getFastTrackUnderruns(i);
         thread->mFastTrackAvailMask &= ~(1 << i);
     }
+
+#ifdef ENABLE_DUAL_AUDIO
+    if( mStreamType == AUDIO_STREAM_EXT_SPEAKER ) {
+        NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+        if( pDualAudio ) pDualAudio->AddTrack( sessionId, mStreamType, false, channelMask, sampleRate, format );
+    }
+#endif
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -482,6 +493,13 @@ AudioFlinger::PlaybackThread::Track::~Track()
     if (mSharedBuffer != 0) {
         mSharedBuffer.clear();
     }
+
+#ifdef ENABLE_DUAL_AUDIO
+    if( mStreamType == AUDIO_STREAM_EXT_SPEAKER ) {
+        NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+        if( pDualAudio ) pDualAudio->RemoveTrack( sessionId() );
+    }
+#endif
 }
 
 status_t AudioFlinger::PlaybackThread::Track::initCheck() const
@@ -630,6 +648,14 @@ status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(
     if (buf.mFrameCount == 0) {
         mAudioTrackServerProxy->tallyUnderrunFrames(desiredFrames);
     }
+
+#ifdef ENABLE_DUAL_AUDIO
+    if( mStreamType == AUDIO_STREAM_EXT_SPEAKER ) {
+        NX_IDualAudio *pDualAudio = GetDualAudioInstance();
+        if( pDualAudio ) pDualAudio->Write( sessionId(), (int8_t*)buffer->raw, mFrameSize * buffer->frameCount );
+    }
+#endif
+
     return status;
 }
 
